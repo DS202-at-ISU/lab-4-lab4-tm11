@@ -1,0 +1,87 @@
+---
+title: "Progress Report"
+author: "Keegan Moerke"
+date: "2024-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rvest)
+```
+
+```{r scrape}
+url = 'https://www.baseball-reference.com/awards/hof_2024.shtml'
+
+
+html <- read_html(url)
+tables <- html_table(html)
+
+
+raw_data <- tables[[1]]
+
+
+head(raw_data)
+```
+
+# Cleaning Data
+
+```{r}
+# Extract the column names from the first row and clean the dataset
+actual_col_names <- raw_data[1, ]
+colnames(raw_data) <- actual_col_names
+cleaned_data <- raw_data[-1, ]
+
+# Display the first few rows of the cleaned data
+head(cleaned_data)
+
+library(readr)
+# Make all column names unique
+colnames(cleaned_data) <- make.unique(colnames(cleaned_data))
+
+# Parse numeric columns, including Votes and %vote
+cleaned_data <- cleaned_data %>%
+  mutate(
+    Votes = readr::parse_number(Votes),
+    PercentVote = readr::parse_number(`%vote`)
+  )
+
+# Display the structure of the cleaned data
+str(cleaned_data)
+```
+
+
+```{r}
+library(Lahman)
+
+# Load the existing Hall of Fame data
+hof_data <- HallOfFame
+
+# Select and rename columns to match the existing Hall of Fame table
+new_data <- cleaned_data %>%
+  mutate(Name = gsub("X-", "", Name)) %>%
+  mutate(Name = gsub(" ", "", Name)) %>%
+  select(
+    playerID = Name,
+    yearID = `YoB`,
+    votes = Votes,
+    needed = `PercentVote`,
+    inducted = `HOFm`
+  ) %>%
+  mutate(
+    yearID = 2024,
+    inducted = ifelse(inducted >= 75, "Y", "N"),
+    category = "Player"
+  )
+
+extended_hof <- bind_rows(hof_data, new_data)
+
+
+write.csv(extended_hof, file = "HallOfFame.csv", row.names = FALSE)
+
+
+print(new_data)
+```
+
+
